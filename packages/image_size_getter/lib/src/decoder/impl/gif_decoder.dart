@@ -41,6 +41,19 @@ class GifDecoder extends BaseDecoder with MutilFileHeaderAndFooterValidator {
   MutilFileHeaderAndFooter get headerAndFooter => _GifInfo();
 }
 
+/// Internal class that defines GIF file format validation rules.
+///
+/// This class supports both standard and non-standard GIF files:
+/// - Standard GIF files end with the 0x3B trailer byte
+/// - Non-standard GIF files may omit the 0x3B trailer
+///
+/// The relaxed footer validation (accepting files without 0x3B) is intentional
+/// because:
+/// 1. Some valid GIF files produced by certain encoders don't include the trailer
+/// 2. The GIF size information is stored in the header (bytes 6-10), not the footer
+/// 3. The primary purpose of this library is to extract image dimensions, not
+///    to perform comprehensive file validation
+/// 4. The GIF header is still validated, ensuring basic format correctness
 class _GifInfo with MutilFileHeaderAndFooter {
   static const start89a = [
     0x47,
@@ -60,9 +73,14 @@ class _GifInfo with MutilFileHeaderAndFooter {
   ];
 
   static const end = [0x3B];
+  
+  // Allow GIF files without the standard 0x3B trailer.
+  // Some GIF encoders create valid GIF files without the trailer byte.
+  // We provide both options: with trailer and without (empty list).
+  static const emptyEnd = <int>[];
 
   @override
-  List<List<int>> get mutipleEndBytesList => [end];
+  List<List<int>> get mutipleEndBytesList => [end, emptyEnd];
 
   @override
   List<List<int>> get mutipleStartBytesList => [

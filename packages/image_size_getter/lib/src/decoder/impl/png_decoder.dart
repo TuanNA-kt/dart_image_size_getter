@@ -5,18 +5,12 @@ import 'package:image_size_getter/image_size_getter.dart';
 /// [PngDecoder] is a class for decoding PNG image.
 ///
 /// {@endtemplate}
-class PngDecoder extends BaseDecoder with SimpleTypeValidator {
+class PngDecoder extends BaseDecoder with MutilFileHeaderAndFooterValidator {
   /// {@macro image_size_getter.PngDecoder}
-
-  const PngDecoder({
-    this.isStandardPng = false, // Default to lenient
-  });
-
-  final bool isStandardPng;
+  const PngDecoder();
 
   @override
-  String get decoderName => isStandardPng ? 'png' : 'non-standard-png';
-
+  String get decoderName => 'png';
 
   @override
   List<String> get supportedExtensions => List.unmodifiable(['png']);
@@ -40,13 +34,14 @@ class PngDecoder extends BaseDecoder with SimpleTypeValidator {
     final height = convertRadix16ToInt(heightList);
     return Size(width, height);
   }
-
+  
   @override
-  SimpleFileHeaderAndFooter get simpleFileHeaderAndFooter =>
-      isStandardPng ? _StandardPngHeaders() : _NonStandardPngHeaders();
+  MutilFileHeaderAndFooter get headerAndFooter => _PngInfo();
+
+
 }
 
-class _StandardPngHeaders with SimpleFileHeaderAndFooter {
+class _PngInfo with MutilFileHeaderAndFooter {
   static const sig = [
     0x89,
     0x50,
@@ -73,37 +68,16 @@ class _StandardPngHeaders with SimpleFileHeaderAndFooter {
     0x82
   ];
 
-  @override
-  List<int> get endBytes => iend;
-
-  @override
-  List<int> get startBytes => sig;
-}
-
-/// Non-standard PNG Info
+/// Some PNG files contain trailing bytes or extra data after the IEND chunk.
 ///
-/// Some PNG files have trailing bytes after the IEND chunk.
-///
-/// These files are technically invalid per PNG specification, but are
-/// commonly produced by various tools and should be supported for
-/// interoperability with other image libraries.
-class _NonStandardPngHeaders with SimpleFileHeaderAndFooter {
-  static const sig = [
-    0x89,
-    0x50,
-    0x4E,
-    0x47,
-    0x0D,
-    0x0A,
-    0x1A,
-    0x0A,
-  ];
-
-  static const iend = <int>[];
+/// While standard decoders just ignore this extra data, a strict check at the 
+/// very end of the file will fail because the IEND chunk is no longer located there.
+/// Using an empty list bypasses the footer validation to maximize interoperability.
+static const emptyEnd = <int>[];
+  
+  @override
+  List<List<int>> get mutipleStartBytesList => [sig];
 
   @override
-  List<int> get endBytes => iend;
-
-  @override
-  List<int> get startBytes => sig;
+  List<List<int>> get mutipleEndBytesList => [iend, emptyEnd];
 }

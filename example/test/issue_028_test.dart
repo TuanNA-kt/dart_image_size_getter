@@ -18,97 +18,45 @@ void main() {
 
       expect(pngFiles.isNotEmpty, true,
           reason: 'No PNG files found in asset/issue28/');
-
-      print('Found ${pngFiles.length} PNG files to test');
     });
 
-    test('all PNG files should work with non-standard mode', () {
-      final nonStandardDecoder = PngDecoder(isStandardPng: false);
-      ImageSizeGetter.registerDecoder(nonStandardDecoder);
-
+    test('all PNG files decode successfully with correct decoder name', () {
       for (final file in pngFiles) {
-        print('\nTesting: ${file.path}');
-
         final fileInput = FileInput(file);
-        final result = ImageSizeGetter.getSizeResult(
-          fileInput,
-        );
-
-        print('  Size: ${result.size.width}x${result.size.height}');
-        print('  Decoded by: ${result.decoder.decoderName}');
+        final result = ImageSizeGetter.getSizeResult(fileInput);
 
         expect(result.size.width, greaterThan(0));
         expect(result.size.height, greaterThan(0));
-        expect(result.decoder.decoderName, 'non-standard-png');
+        expect(result.decoder.decoderName, 'png');
       }
     });
 
-    test('PNG with trailing bytes should fail in standard mode', () {
-      final standardDecoder = PngDecoder(isStandardPng: true);
-      ImageSizeGetter.registerDecoder(standardDecoder);
-      // Find the bug PNG (the one with trailing bytes)
-      final bugPng = pngFiles.firstWhere(
-            (f) => f.path.contains('bug') || f.path.contains('trailing'),
-        orElse: () => pngFiles.last, // Assume last one is the bug
-      );
+    test('PNG with trailing bytes after IEND still decodes correctly', () {
+      // issue28-1.png has trailing data after its first IEND chunk.
+      final bugPng = File('asset/issue28/issue28-1.png');
 
-      print('\nTesting bug PNG with standard mode: ${bugPng.path}');
+      expect(bugPng.existsSync(), true,
+          reason: 'Expected fixture asset/issue28/issue28-1.png to exist');
 
-      // Standard mode should reject it
-      expect(
-            () => ImageSizeGetter.getSizeResult(
-          FileInput(bugPng),
-        ),
-        throwsA(isA<UnsupportedError>()),
-        reason: 'Standard mode should reject PNG with trailing bytes',
-      );
+      final result = ImageSizeGetter.getSizeResult(FileInput(bugPng));
 
-      print('  ✓ Correctly rejected by standard mode');
+      expect(result.size.width, 1000);
+      expect(result.size.height, 1000);
+      expect(result.decoder.decoderName, 'png');
     });
 
-    test('same PNG should succeed with non-standard mode', () {
-      final nonStandardDecoder = PngDecoder(isStandardPng: false);
-      ImageSizeGetter.registerDecoder(nonStandardDecoder);
-      // Find the bug PNG
-      final bugPng = pngFiles.firstWhere(
-            (f) => f.path.contains('bug') || f.path.contains('trailing'),
-        orElse: () => pngFiles.last,
-      );
+    test('standard PNG with no trailing bytes still decodes correctly', () {
+      // issue28-2.png is a standard, well-formed PNG (IEND at EOF).
+      final standardPng = File('asset/issue28/issue28-2.png');
 
-      print('\nTesting bug PNG with non-standard mode: ${bugPng.path}');
+      expect(standardPng.existsSync(), true,
+          reason: 'Expected fixture asset/issue28/issue28-2.png to exist');
 
-      // Non-standard mode should accept it
-      final result = ImageSizeGetter.getSizeResult(
-        FileInput(bugPng)
-      );
+      final result = ImageSizeGetter.getSizeResult(FileInput(standardPng));
 
-      print('  Size: ${result.size.width}x${result.size.height}');
-      print('  ✓ Successfully decoded');
-
-      expect(result.size.width, greaterThan(0));
-      expect(result.size.height, greaterThan(0));
-    });
-
-    test('default PngDecoder should use non-standard mode', () {
-      // When no parameter is passed, should default to non-standard (lenient)
-      final defaultDecoder = PngDecoder();
-      ImageSizeGetter.registerDecoder(defaultDecoder);
-      for (final file in pngFiles) {
-        final result = ImageSizeGetter.getSizeResult(
-          FileInput(file),
-        );
-
-        expect(result.size.width, greaterThan(0));
-        expect(result.decoder.decoderName, 'non-standard-png');
-      }
-    });
-
-    test('verify decoder names', () {
-      final standard = PngDecoder(isStandardPng: true);
-      final nonStandard = PngDecoder(isStandardPng: false);
-
-      expect(standard.decoderName, 'png');
-      expect(nonStandard.decoderName, 'non-standard-png');
+      expect(result.size.width, 2200);
+      expect(result.size.height, 1467);
+      expect(result.decoder.decoderName, 'png');
     });
   });
 }
